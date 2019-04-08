@@ -1,12 +1,16 @@
 module Main exposing (Model, Msg(..), init, main, update, view)
 
 import Browser
-import Html exposing (Html, button, div, text)
+import Css exposing (..)
+import Html
 import Html.Events exposing (onClick)
+import Html.Styled exposing (..)
+import Html.Styled.Attributes exposing (css, href, src)
+import Html.Styled.Events exposing (onClick)
 
 
 main =
-    Browser.sandbox { init = init, update = update, view = view }
+    Browser.sandbox { init = init, update = update, view = view >> toUnstyled }
 
 
 
@@ -99,11 +103,24 @@ update msg model =
 -- VIEW
 
 
+buttonStyle =
+    css
+        [ backgroundColor (hex "eeeeee")
+        , padding (px 5)
+        , width (px 50)
+        , borderRadius (px 3)
+        , hover
+            [ backgroundColor (hex "ffffff") ]
+        ]
+
+
 view : Model -> Html Msg
 view model =
     div []
-        [ button [ onClick Decrement ] [ text "-" ]
+        [ button
+            [ onClick Decrement, buttonStyle ]
+            [ text "-" ]
         , div [] [ text (String.fromInt model) ]
-        , button [ onClick Increment ] [ text "+" ]
+        , button [ onClick Increment, buttonStyle ] [ text "+" ]
         , div [] [ text (showHuiProssysh c) ]
         ]
