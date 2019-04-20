@@ -1,11 +1,11 @@
 module Main exposing (Model, Msg(..), init, main, update, view)
 
 import Browser
+import FormField exposing (FormField, isValid, validationMessages)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
 import Http
-import String exposing (length)
 
 
 main =
@@ -15,6 +15,29 @@ main =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.none
+
+
+type LoginState
+    = LoggedIn UserDetails
+    | NotLoggedIn FormErrors FormFields
+
+
+type alias UserDetails =
+    { username : Username
+    , token : Token
+    }
+
+
+type FormErrors
+    = NoError
+    | ServerError String -- errorMessage
+    | Pending
+
+
+type alias FormFields =
+    { username : FormField Username
+    , password : FormField String
+    }
 
 
 type alias Token =
@@ -29,39 +52,25 @@ type alias ServerError =
     Maybe String
 
 
-type alias UserDetails =
-    { username : Username
-    , token : Token
-    }
-
-
-type alias FormFields =
-    { username : Username
-    , password : String
-    }
-
-
-type EditingState
-    = Submittable ServerError
-      -- ServerError: either manually touched (Nothing) or rejected by server (Just errorMessage)
-    | Invalid
-    | Pending
-
-
-type LoginState
-    = LoggedIn UserDetails
-    | NotLoggedIn EditingState FormFields
-
-
 type alias Model =
     LoginState
 
 
+usernameValidation =
+    [ ( \str -> String.length str >= 3, "length should be 3 or more characters" )
+    , ( \str -> String.length str >= 5, "length should be 5 or more characters" )
+    ]
+
+
+passwordValidation =
+    [ ( \str -> String.length str >= 3, "length should be 3 or more characters" ) ]
+
+
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( NotLoggedIn Invalid
-        { username = ""
-        , password = ""
+    ( NotLoggedIn NoError
+        { username = FormField.create usernameValidation ""
+        , password = FormField.create passwordValidation ""
         }
     , Cmd.none
     )
@@ -72,39 +81,64 @@ type Msg
     | ChangePassword String
     | Submit
     | LoginResult (Result Http.Error Token)
-    | Logout ServerError -- Either manual login (Nothing) or force logout (Just errorMessage)
+    | ManualLogout
+    | ForceLogout String -- errorMessage
 
 
-
--- | LoginFailed String
+noCommands model =
+    ( model, Cmd.none )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case ( model, msg ) of
         -- Editable -> Editable
-        ( NotLoggedIn _ fields, ChangeLogin newValue ) ->
-            ( updateFields { fields | username = newValue }, Cmd.none )
+        ( NotLoggedIn errors fields, ChangeLogin newUsername ) ->
+            NotLoggedIn errors { fields | username = FormField.set newUsername fields.username } |> noCommands
 
         -- Editable -> Editable
-        ( NotLoggedIn _ fields, ChangePassword newValue ) ->
-            ( updateFields { fields | password = newValue }, Cmd.none )
+        ( NotLoggedIn errors fields, ChangePassword newPassword ) ->
+            NotLoggedIn errors { fields | password = FormField.set newPassword fields.password } |> noCommands
 
         -- Submittable -> Pending
-        ( NotLoggedIn (Submittable _) fields, Submit ) ->
-            ( NotLoggedIn Pending fields, performLogin )
+        ( NotLoggedIn NoError fields, Submit ) ->
+            if isValid fields.username && isValid fields.password then
+                ( NotLoggedIn Pending fields, performLogin )
+
+            else
+                model |> noCommands
+
+        -- Submittable -> Pending (duplicate, remove by moving Pending up)
+        ( NotLoggedIn (ServerError _) fields, Submit ) ->
+            if isValid fields.username && isValid fields.password then
+                ( NotLoggedIn Pending fields, performLogin )
+
+            else
+                model |> noCommands
 
         -- Pending -> Login Successful
-        ( NotLoggedIn Pending fields, LoginResult (Ok token) ) ->
-            ( LoggedIn { username = fields.username, token = token }, Cmd.none )
+        ( NotLoggedIn Pending { username }, LoginResult (Ok token) ) ->
+            LoggedIn { username = FormField.value username, token = token } |> noCommands
 
         -- Pending -> Login Failed
         ( NotLoggedIn Pending fields, LoginResult (Err err) ) ->
-            ( NotLoggedIn (Submittable <| Just (parseError err)) fields, Cmd.none )
+            NotLoggedIn (ServerError <| parseError err) fields |> noCommands
 
         -- Logged In -> Logged Out
-        ( LoggedIn details, Logout maybeError ) ->
-            ( NotLoggedIn (Submittable maybeError) { username = details.username, password = "" }, Cmd.none )
+        ( LoggedIn details, ManualLogout ) ->
+            NotLoggedIn NoError
+                { username = FormField.create usernameValidation details.username
+                , password = FormField.create passwordValidation ""
+                }
+                |> noCommands
+
+        -- Logged In -> Logged Out
+        ( LoggedIn details, ForceLogout errorMessage ) ->
+            NotLoggedIn (ServerError errorMessage)
+                { username = FormField.create usernameValidation details.username
+                , password = FormField.create passwordValidation ""
+                }
+                |> noCommands
 
         -- No other transitions of state are defined, use previous state
         _ ->
@@ -142,38 +176,45 @@ parseError err =
             "Bad Body " ++ s
 
 
-checkValidity : FormFields -> EditingState
-checkValidity fields =
-    if (length fields.username >= 3) && (length fields.password >= 3) then
-        Submittable Nothing
 
-    else
-        Invalid
-
-
-updateFields fields =
-    NotLoggedIn (checkValidity fields) fields
+-- TODO: решить вопрос с тем, чтобы включить оторажение ошибок всех полей по нажатию Submit
 
 
 view : Model -> Html Msg
 view model =
     case model of
-        LoggedIn details ->
-            div [] [ text <| "welcome, " ++ details.username, button [ onClick (Logout Nothing) ] [ text "Log out" ] ]
+        LoggedIn { username } ->
+            div [] [ text <| "welcome, " ++ username, button [ onClick ManualLogout ] [ text "Log out" ] ]
 
-        NotLoggedIn editingState fields ->
+        NotLoggedIn editingState { username, password } ->
             div
                 []
                 [ div [] [ text "Username" ]
-                , input [ value fields.username, onInput ChangeLogin, disabled (isPendingState editingState) ] []
+                , div []
+                    [ input [ value <| FormField.value username, onInput ChangeLogin, disabled (isPendingState editingState) ] []
+                    , viewValidationMessages username
+                    ]
                 , div [] [ text "Password" ]
-                , input [ value fields.password, onInput ChangePassword, disabled (isPendingState editingState) ] []
-                , div [] [ button [ onClick Submit, disabled <| not <| isSubmittableState editingState ] [ text "Submit" ] ]
-                , viewEditingState editingState
+                , div []
+                    [ input [ value <| FormField.value password, onInput ChangePassword, disabled (isPendingState editingState) ] []
+                    , viewValidationMessages password
+                    ]
+                , div []
+                    [ button [ onClick Submit, disabled <| isPendingState editingState ] [ text "Submit" ]
+                    ]
+                , viewFormErrors editingState
                 ]
 
 
-isPendingState : EditingState -> Bool
+viewValidationMessages : FormField a -> Html Msg
+viewValidationMessages ff =
+    validationMessages ff
+        |> Maybe.map (List.intersperse ", " >> String.concat)
+        |> Maybe.withDefault "👍"
+        |> text
+
+
+isPendingState : FormErrors -> Bool
 isPendingState st =
     case st of
         Pending ->
@@ -183,23 +224,23 @@ isPendingState st =
             False
 
 
-isSubmittableState : EditingState -> Bool
+isSubmittableState : FormErrors -> Bool
 isSubmittableState st =
     case st of
-        Submittable _ ->
+        NoError ->
             True
 
         _ ->
             False
 
 
-viewEditingState : EditingState -> Html Msg
-viewEditingState st =
+viewFormErrors : FormErrors -> Html Msg
+viewFormErrors st =
     case st of
         Pending ->
             div [] [ text "logging in..." ]
 
-        Submittable (Just errorMessage) ->
+        ServerError errorMessage ->
             div [] [ text errorMessage ]
 
         _ ->
