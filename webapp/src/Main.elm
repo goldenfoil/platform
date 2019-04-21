@@ -1,11 +1,13 @@
 module Main exposing (Model, Msg(..), init, main, update, view)
 
 import Browser
-import FormField exposing (FormField, isValid, validationMessages)
+import FormField as FF exposing (FormField)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
 import Http
+import Json.Decode as D
+import Json.Encode as E
 
 
 main =
@@ -17,14 +19,14 @@ subscriptions model =
     Sub.none
 
 
-type LoginState
-    = LoggedIn UserDetails
-    | NotLoggedIn FormErrors FormFields
+type AuthenticationState
+    = Authenticated UserDetails
+    | NotAuthenticated FormErrors FormFields Bool -- submitAttempted
 
 
 type alias UserDetails =
-    { username : Username
-    , token : Token
+    { username : String
+    , token : String
     }
 
 
@@ -35,109 +37,99 @@ type FormErrors
 
 
 type alias FormFields =
-    { username : FormField Username
+    { username : FormField String
     , password : FormField String
     }
 
 
-type alias Token =
-    String
-
-
-type alias Username =
-    String
-
-
-type alias ServerError =
-    Maybe String
-
-
 type alias Model =
-    LoginState
-
-
-usernameValidation =
-    [ ( \str -> String.length str >= 3, "length should be 3 or more characters" )
-    , ( \str -> String.length str >= 5, "length should be 5 or more characters" )
-    ]
-
-
-passwordValidation =
-    [ ( \str -> String.length str >= 3, "length should be 3 or more characters" ) ]
+    AuthenticationState
 
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( NotLoggedIn NoError
-        { username = FormField.create usernameValidation ""
-        , password = FormField.create passwordValidation ""
+    ( NotAuthenticated NoError
+        { username = FF.create usernameValidation ""
+        , password = FF.create passwordValidation ""
         }
+        False
     , Cmd.none
     )
 
 
+usernameValidation =
+    [ ( \str -> String.length str >= 5, "Should contain at least 5 characters" )
+    , ( String.all Char.isAlphaNum, "Should contain only digits or letters" )
+    ]
+
+
+passwordValidation =
+    [ ( \str -> String.length str >= 8, "Should contain at least 8 characters" )
+    , ( String.any Char.isDigit, "Should contain digits" )
+    , ( String.any Char.isAlpha, "Should contain letters" )
+    ]
+
+
 type Msg
-    = ChangeLogin Username
+    = ChangeUsername String
     | ChangePassword String
     | Submit
-    | LoginResult (Result Http.Error Token)
-    | ManualLogout
-    | ForceLogout String -- errorMessage
-
-
-noCommands model =
-    ( model, Cmd.none )
+    | AuthResult (Result Http.Error String) -- token
+    | ManualSignOut
+    | ForceSignOut String -- errorMessage
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case ( model, msg ) of
         -- Editable -> Editable
-        ( NotLoggedIn errors fields, ChangeLogin newUsername ) ->
-            NotLoggedIn errors { fields | username = FormField.set newUsername fields.username } |> noCommands
+        ( NotAuthenticated errors fields submitAttempted, ChangeUsername newUsername ) ->
+            NotAuthenticated errors { fields | username = FF.set newUsername fields.username } submitAttempted |> noCommands
 
         -- Editable -> Editable
-        ( NotLoggedIn errors fields, ChangePassword newPassword ) ->
-            NotLoggedIn errors { fields | password = FormField.set newPassword fields.password } |> noCommands
+        ( NotAuthenticated errors fields submitAttempted, ChangePassword newPassword ) ->
+            NotAuthenticated errors { fields | password = FF.set newPassword fields.password } submitAttempted |> noCommands
 
         -- Submittable -> Pending
-        ( NotLoggedIn NoError fields, Submit ) ->
-            if isValid fields.username && isValid fields.password then
-                ( NotLoggedIn Pending fields, performLogin )
+        ( NotAuthenticated NoError fields _, Submit ) ->
+            if FF.isValid fields.username && FF.isValid fields.password then
+                ( NotAuthenticated Pending fields True, performSignIn fields )
 
             else
-                model |> noCommands
+                NotAuthenticated NoError fields True |> noCommands
 
-        -- Submittable -> Pending (duplicate, remove by moving Pending up)
-        ( NotLoggedIn (ServerError _) fields, Submit ) ->
-            if isValid fields.username && isValid fields.password then
-                ( NotLoggedIn Pending fields, performLogin )
+        -- Submittable -> Pending -- TODO: duplicate, remove by moving Pending up
+        ( NotAuthenticated (ServerError e) fields _, Submit ) ->
+            if FF.isValid fields.username && FF.isValid fields.password then
+                ( NotAuthenticated Pending fields True, performSignIn fields )
 
             else
-                model |> noCommands
+                NotAuthenticated (ServerError e) fields True |> noCommands
 
         -- Pending -> Login Successful
-        ( NotLoggedIn Pending { username }, LoginResult (Ok token) ) ->
-            LoggedIn { username = FormField.value username, token = token } |> noCommands
+        ( NotAuthenticated Pending { username } _, AuthResult (Ok token) ) ->
+            Authenticated { username = FF.value username, token = token } |> noCommands
 
         -- Pending -> Login Failed
-        ( NotLoggedIn Pending fields, LoginResult (Err err) ) ->
-            NotLoggedIn (ServerError <| parseError err) fields |> noCommands
+        ( NotAuthenticated Pending fields _, AuthResult (Err err) ) ->
+            NotAuthenticated (ServerError <| parseError err) fields True |> noCommands
 
         -- Logged In -> Logged Out
-        ( LoggedIn details, ManualLogout ) ->
-            NotLoggedIn NoError
-                { username = FormField.create usernameValidation details.username
-                , password = FormField.create passwordValidation ""
+        ( Authenticated { username }, ManualSignOut ) ->
+            NotAuthenticated NoError
+                { username = FF.create usernameValidation username
+                , password = FF.create passwordValidation ""
                 }
+                False
                 |> noCommands
 
         -- Logged In -> Logged Out
-        ( LoggedIn details, ForceLogout errorMessage ) ->
-            NotLoggedIn (ServerError errorMessage)
-                { username = FormField.create usernameValidation details.username
-                , password = FormField.create passwordValidation ""
+        ( Authenticated { username }, ForceSignOut errorMessage ) ->
+            NotAuthenticated (ServerError errorMessage)
+                { username = FF.create usernameValidation username
+                , password = FF.create passwordValidation ""
                 }
+                False
                 |> noCommands
 
         -- No other transitions of state are defined, use previous state
@@ -145,16 +137,31 @@ update msg model =
             ( model, Cmd.none )
 
 
+noCommands model =
+    ( model, Cmd.none )
+
+
 apiUrl : String
 apiUrl =
-    "http://localhost:3000/api/balance"
+    "http://localhost:3000/api/login"
 
 
-performLogin =
-    Http.get
+performSignIn : FormFields -> Cmd Msg
+performSignIn fields =
+    Http.post
         { url = apiUrl
-        , expect = Http.expectString LoginResult
+        , body =
+            Http.jsonBody (credentialsEncoder fields)
+        , expect = Http.expectJson AuthResult (D.field "token" D.string) -- TODO: map error
         }
+
+
+credentialsEncoder : FormFields -> E.Value
+credentialsEncoder { username, password } =
+    E.object
+        [ ( "username", E.string (FF.value username) )
+        , ( "password", E.string (FF.value password) )
+        ]
 
 
 parseError : Http.Error -> String
@@ -183,51 +190,55 @@ parseError err =
 view : Model -> Html Msg
 view model =
     case model of
-        LoggedIn { username } ->
-            div [] [ text <| "welcome, " ++ username, button [ onClick ManualLogout ] [ text "Log out" ] ]
+        Authenticated { username } ->
+            div []
+                [ text ("Welcome, " ++ username)
+                , div [] [ button [ onClick ManualSignOut ] [ text "Sign out" ] ]
+                ]
 
-        NotLoggedIn editingState { username, password } ->
+        NotAuthenticated formErrors { username, password } submitAttempted ->
             div
                 []
                 [ div [] [ text "Username" ]
-                , div []
-                    [ input [ value <| FormField.value username, onInput ChangeLogin, disabled (isPendingState editingState) ] []
-                    , viewValidationMessages username
-                    ]
+                , viewInput submitAttempted formErrors username ChangeUsername
                 , div [] [ text "Password" ]
+                , viewInput submitAttempted formErrors password ChangePassword
                 , div []
-                    [ input [ value <| FormField.value password, onInput ChangePassword, disabled (isPendingState editingState) ] []
-                    , viewValidationMessages password
+                    [ button [ onClick Submit, disabled (isPendingState formErrors) ] [ text "Sign in" ]
                     ]
-                , div []
-                    [ button [ onClick Submit, disabled <| isPendingState editingState ] [ text "Submit" ]
-                    ]
-                , viewFormErrors editingState
+                , viewFormErrors formErrors
                 ]
 
 
-viewValidationMessages : FormField a -> Html Msg
-viewValidationMessages ff =
-    validationMessages ff
-        |> Maybe.map (List.intersperse ", " >> String.concat)
-        |> Maybe.withDefault "👍"
-        |> text
+viewInput : Bool -> FormErrors -> FormField String -> (String -> Msg) -> Html Msg
+viewInput submitAttempted formErrors field msg =
+    div []
+        [ input
+            [ value (FF.value field)
+            , onInput msg
+            , disabled (isPendingState formErrors)
+            ]
+            []
+        , viewValidationMessages submitAttempted field
+        ]
+
+
+viewValidationMessages : Bool -> FormField a -> Html Msg
+viewValidationMessages submitAttempted field =
+    if submitAttempted || FF.wasChanged field then
+        FF.validationMessages field
+            |> Maybe.map (List.intersperse ", " >> String.concat)
+            |> Maybe.withDefault "✓"
+            |> text
+
+    else
+        div [] []
 
 
 isPendingState : FormErrors -> Bool
-isPendingState st =
-    case st of
+isPendingState errs =
+    case errs of
         Pending ->
-            True
-
-        _ ->
-            False
-
-
-isSubmittableState : FormErrors -> Bool
-isSubmittableState st =
-    case st of
-        NoError ->
             True
 
         _ ->
@@ -235,10 +246,10 @@ isSubmittableState st =
 
 
 viewFormErrors : FormErrors -> Html Msg
-viewFormErrors st =
-    case st of
+viewFormErrors errs =
+    case errs of
         Pending ->
-            div [] [ text "logging in..." ]
+            div [] [ text "Signing in..." ]
 
         ServerError errorMessage ->
             div [] [ text errorMessage ]

@@ -5,5 +5,3 @@ repl-temp-*
 
 # webapp build
 webapp/build
-# elm-live  (сохраняет для своих целей index.html, не имеющий отношения к основному.)
-webapp/index.html 
