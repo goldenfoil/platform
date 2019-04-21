@@ -1,11 +1,13 @@
 module Main exposing (Model, Msg(..), init, main, update, view)
 
 import Browser
-import FormField exposing (FormField, isValid, validationMessages)
+import FormField as FF exposing (FormField)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
 import Http
+import Json.Decode as D
+import Json.Encode as E
 
 
 main =
@@ -23,8 +25,8 @@ type LoginState
 
 
 type alias UserDetails =
-    { username : Username
-    , token : Token
+    { username : String
+    , token : String
     }
 
 
@@ -35,58 +37,45 @@ type FormErrors
 
 
 type alias FormFields =
-    { username : FormField Username
+    { username : FormField String
     , password : FormField String
     }
-
-
-type alias Token =
-    String
-
-
-type alias Username =
-    String
-
-
-type alias ServerError =
-    Maybe String
 
 
 type alias Model =
     LoginState
 
 
-usernameValidation =
-    [ ( \str -> String.length str >= 3, "length should be 3 or more characters" )
-    , ( \str -> String.length str >= 5, "length should be 5 or more characters" )
-    ]
-
-
-passwordValidation =
-    [ ( \str -> String.length str >= 3, "length should be 3 or more characters" ) ]
-
-
 init : () -> ( Model, Cmd Msg )
 init _ =
     ( NotLoggedIn NoError
-        { username = FormField.create usernameValidation ""
-        , password = FormField.create passwordValidation ""
+        { username = FF.create usernameValidation ""
+        , password = FF.create passwordValidation ""
         }
     , Cmd.none
     )
 
 
+usernameValidation =
+    [ ( \str -> String.length str >= 8, "Should have length of 8 characters or more" )
+    , ( String.all Char.isAlphaNum, "Should contain only digits or letters" )
+    ]
+
+
+passwordValidation =
+    [ ( \str -> String.length str >= 8, "Should have length of 8 characters or more" )
+    , ( String.any Char.isDigit, "Should contain digits" )
+    , ( String.any Char.isAlpha, "Should contain letters" )
+    ]
+
+
 type Msg
-    = ChangeLogin Username
+    = ChangeLogin String
     | ChangePassword String
     | Submit
-    | LoginResult (Result Http.Error Token)
+    | LoginResult (Result Http.Error String) -- token
     | ManualLogout
     | ForceLogout String -- errorMessage
-
-
-noCommands model =
-    ( model, Cmd.none )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -94,49 +83,49 @@ update msg model =
     case ( model, msg ) of
         -- Editable -> Editable
         ( NotLoggedIn errors fields, ChangeLogin newUsername ) ->
-            NotLoggedIn errors { fields | username = FormField.set newUsername fields.username } |> noCommands
+            NotLoggedIn errors { fields | username = FF.set newUsername fields.username } |> noCommands
 
         -- Editable -> Editable
         ( NotLoggedIn errors fields, ChangePassword newPassword ) ->
-            NotLoggedIn errors { fields | password = FormField.set newPassword fields.password } |> noCommands
+            NotLoggedIn errors { fields | password = FF.set newPassword fields.password } |> noCommands
 
         -- Submittable -> Pending
         ( NotLoggedIn NoError fields, Submit ) ->
-            if isValid fields.username && isValid fields.password then
-                ( NotLoggedIn Pending fields, performLogin )
+            if FF.isValid fields.username && FF.isValid fields.password then
+                ( NotLoggedIn Pending fields, performLogin fields )
 
             else
                 model |> noCommands
 
-        -- Submittable -> Pending (duplicate, remove by moving Pending up)
+        -- Submittable -> Pending -- TODO: duplicate, remove by moving Pending up
         ( NotLoggedIn (ServerError _) fields, Submit ) ->
-            if isValid fields.username && isValid fields.password then
-                ( NotLoggedIn Pending fields, performLogin )
+            if FF.isValid fields.username && FF.isValid fields.password then
+                ( NotLoggedIn Pending fields, performLogin fields )
 
             else
                 model |> noCommands
 
         -- Pending -> Login Successful
         ( NotLoggedIn Pending { username }, LoginResult (Ok token) ) ->
-            LoggedIn { username = FormField.value username, token = token } |> noCommands
+            LoggedIn { username = FF.value username, token = token } |> noCommands
 
         -- Pending -> Login Failed
         ( NotLoggedIn Pending fields, LoginResult (Err err) ) ->
             NotLoggedIn (ServerError <| parseError err) fields |> noCommands
 
         -- Logged In -> Logged Out
-        ( LoggedIn details, ManualLogout ) ->
+        ( LoggedIn {username}, ManualLogout ) ->
             NotLoggedIn NoError
-                { username = FormField.create usernameValidation details.username
-                , password = FormField.create passwordValidation ""
+                { username = FF.create usernameValidation username
+                , password = FF.create passwordValidation ""
                 }
                 |> noCommands
 
         -- Logged In -> Logged Out
-        ( LoggedIn details, ForceLogout errorMessage ) ->
+        ( LoggedIn {username}, ForceLogout errorMessage ) ->
             NotLoggedIn (ServerError errorMessage)
-                { username = FormField.create usernameValidation details.username
-                , password = FormField.create passwordValidation ""
+                { username = FF.create usernameValidation username
+                , password = FF.create passwordValidation ""
                 }
                 |> noCommands
 
@@ -145,16 +134,31 @@ update msg model =
             ( model, Cmd.none )
 
 
+noCommands model =
+    ( model, Cmd.none )
+
+
 apiUrl : String
 apiUrl =
-    "http://localhost:3000/api/balance"
+    "http://localhost:3000/api/login"
 
 
-performLogin =
-    Http.get
+performLogin : FormFields -> Cmd Msg
+performLogin fields =
+    Http.post
         { url = apiUrl
-        , expect = Http.expectString LoginResult
+        , body =
+            Http.jsonBody (credentialsEncoder fields)
+        , expect = Http.expectJson LoginResult (D.field "token" D.string) -- TODO: map error
         }
+
+
+credentialsEncoder : FormFields -> E.Value
+credentialsEncoder { username, password } =
+    E.object
+        [ ( "username", E.string (FF.value username) )
+        , ( "password", E.string (FF.value password) )
+        ]
 
 
 parseError : Http.Error -> String
@@ -191,12 +195,12 @@ view model =
                 []
                 [ div [] [ text "Username" ]
                 , div []
-                    [ input [ value <| FormField.value username, onInput ChangeLogin, disabled (isPendingState editingState) ] []
+                    [ input [ value <| FF.value username, onInput ChangeLogin, disabled (isPendingState editingState) ] []
                     , viewValidationMessages username
                     ]
                 , div [] [ text "Password" ]
                 , div []
-                    [ input [ value <| FormField.value password, onInput ChangePassword, disabled (isPendingState editingState) ] []
+                    [ input [ value <| FF.value password, onInput ChangePassword, disabled (isPendingState editingState) ] []
                     , viewValidationMessages password
                     ]
                 , div []
@@ -208,26 +212,16 @@ view model =
 
 viewValidationMessages : FormField a -> Html Msg
 viewValidationMessages ff =
-    validationMessages ff
+    FF.validationMessages ff
         |> Maybe.map (List.intersperse ", " >> String.concat)
-        |> Maybe.withDefault "👍"
+        |> Maybe.withDefault "✓"
         |> text
 
 
 isPendingState : FormErrors -> Bool
-isPendingState st =
-    case st of
+isPendingState errs =
+    case errs of
         Pending ->
-            True
-
-        _ ->
-            False
-
-
-isSubmittableState : FormErrors -> Bool
-isSubmittableState st =
-    case st of
-        NoError ->
             True
 
         _ ->
@@ -235,10 +229,10 @@ isSubmittableState st =
 
 
 viewFormErrors : FormErrors -> Html Msg
-viewFormErrors st =
-    case st of
+viewFormErrors errs =
+    case errs of
         Pending ->
-            div [] [ text "logging in..." ]
+            div [] [ text "Logging in..." ]
 
         ServerError errorMessage ->
             div [] [ text errorMessage ]
