@@ -48,4 +48,4 @@ validationMessages (FormField validations _ y) =
 
 wasChanged : FormField a -> Bool
 wasChanged (FormField f x y) =
-    x == y
+    x /= y
