@@ -200,9 +200,9 @@ view model =
             div
                 []
                 [ div [] [ text "Username" ]
-                , viewInput submitAttempted formErrors username ChangeUsername
+                , viewInput submitAttempted formErrors username ChangeUsername False
                 , div [] [ text "Password" ]
-                , viewInput submitAttempted formErrors password ChangePassword
+                , viewInput submitAttempted formErrors password ChangePassword True
                 , div []
                     [ button [ onClick Submit, disabled (isPendingState formErrors) ] [ text "Sign in" ]
                     ]
@@ -210,11 +210,12 @@ view model =
                 ]
 
 
-viewInput : Bool -> FormErrors -> FormField String -> (String -> Msg) -> Html Msg
-viewInput submitAttempted formErrors field msg =
+viewInput : Bool -> FormErrors -> FormField String -> (String -> Msg) -> Bool -> Html Msg
+viewInput submitAttempted formErrors field msg hideChars=
     div []
         [ input
             [ value (FF.value field)
+            , type_ (if hideChars then "password" else "text")
             , onInput msg
             , disabled (isPendingState formErrors)
             ]
