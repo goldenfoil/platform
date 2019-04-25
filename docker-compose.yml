@@ -1,0 +1,16 @@
+version: '3.5'
+
+services:
+  pg-docker:
+    image: postgres:11.2
+    restart: always
+    volumes:
+      - ./monolith/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - $HOME/docker/volumes/postgres:/var/lib/postgresql/data
+    ports:
+      - '0.0.0.0:5432:5432'
+    environment:
+      POSTGRES_USER: awesome_user
+      POSTGRES_PASSWORD: awesome_password
+      POSTGRES_DB: awesome_db
+    
