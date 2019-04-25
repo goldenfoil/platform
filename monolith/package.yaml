@@ -23,6 +23,9 @@ dependencies:
 - servant-server # for serving http
 - aeson # for json
 - wai # for serving http
+- wai-extra # for HTTP request logger and other things
+- wai-cors # for dealing with CORS
+- servant-options # for dealing with CORS
 - warp # for serving http
 - bytestring
 - beam-core # for postgres
