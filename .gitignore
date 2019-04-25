@@ -5,3 +5,7 @@ repl-temp-*
 
 # webapp build
 webapp/build
+
+monolith/.stack-work/
+monolith/monolith.cabal
+monolith/*~
