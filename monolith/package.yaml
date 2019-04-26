@@ -20,6 +20,8 @@ description:         Please see the README on GitHub at <https://github.com/gold
 
 dependencies:
 - base >= 4.7 && < 5
+- bytestring
+- text
 - servant-server # for serving http
 - aeson # for json
 - wai # for serving http
@@ -27,12 +29,10 @@ dependencies:
 - wai-cors # for dealing with CORS
 - servant-options # for dealing with CORS
 - warp # for serving http
-- bytestring
-- beam-core # for postgres
-- beam-migrate # for postgres
-- beam-postgres # for postgres
-- postgresql-simple # for postgres
-- text
+# - beam-core # for postgres
+# - beam-migrate # for postgres
+# - beam-postgres # for postgres
+# - postgresql-simple # for postgres
 
 library:
   source-dirs: src
@@ -58,3 +58,9 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - monolith
+
+default-extensions:
+- DataKinds # Servant
+- DeriveGeneric # Aeson
+- OverloadedStrings # Wai and other places
+- TypeOperators # Servant

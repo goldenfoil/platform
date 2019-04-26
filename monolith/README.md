@@ -56,3 +56,9 @@ curl "http://localhost:3000/api/login"\
 curl "http://localhost:3000/api/balance"
 
 ```
+
+```bash
+# build with docker
+docker build -t monolith .
+docker run -p 3000:3000 monolith
+```

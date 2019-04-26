@@ -9,3 +9,5 @@ webapp/build
 monolith/.stack-work/
 monolith/monolith.cabal
 monolith/*~
+
+.DS_Store
