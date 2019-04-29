@@ -10,4 +10,8 @@ monolith/.stack-work/
 monolith/monolith.cabal
 monolith/*~
 
+webapp-server/.stack-work/
+webapp-server/webapp-server.cabal
+webapp-server/*~
+
 .DS_Store

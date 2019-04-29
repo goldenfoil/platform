@@ -57,8 +57,13 @@ curl "http://localhost:3000/api/balance"
 
 ```
 
+
 ```bash
-# build with docker
-docker build -t monolith .
-docker run -p 3000:3000 monolith
+# build with docker (first tag is latest, and second tag is commit hash)
+docker build -t goldenfoil/platform.monolith:latest -t goldenfoil/platform.monolith:$(git log -1 --pretty=%h) .
+
+docker push goldenfoil/platform.monolith
+
+# run with docker (use latest unless have a specific need)
+docker run -p 3000:3000 goldenfoil/platform.monolith:latest
 ```

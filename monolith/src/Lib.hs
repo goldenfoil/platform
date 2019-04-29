@@ -13,7 +13,6 @@ type UserAPI =
   "api" :> "login" :> ReqBody '[JSON] PasswordAuth
                    :> Post '[JSON] AuthResult
   :<|> "api" :> "balance" :> Get '[JSON] Balance
-  -- :<|> "static" :> Raw
 
 newtype AuthResult = AuthResult {
   token :: String
@@ -44,7 +43,6 @@ balanceResponse = Balance { balance = 42.042 }
 
 apiServer :: Server UserAPI
 apiServer = authResult :<|> pure balanceResponse 
--- :<|> serveDirectoryWebApp "./static"
 
 apiProxy :: Proxy UserAPI
 apiProxy = Proxy

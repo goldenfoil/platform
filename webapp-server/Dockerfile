@@ -8,8 +8,8 @@ RUN stack build --copy-bins
 
 FROM ubuntu:19.04
 
-COPY --from=builder /root/.local/bin/monolith-exe /app/monolith-exe
+COPY --from=builder /root/.local/bin/webapp-server-exe /app/webapp-server-exe
 
-EXPOSE 3000
+EXPOSE 11001
 
 CMD ["/app/monolith-exe"]
