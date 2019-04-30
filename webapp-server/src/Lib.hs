@@ -12,7 +12,6 @@ type UserAPI = Raw
 
 apiServer :: Server UserAPI
 apiServer = serveDirectoryWebApp "./static"
--- TODO: внутри static в index пути ведут на "."
 -- TODO: index.html не отдается сам
 
 apiProxy :: Proxy UserAPI
