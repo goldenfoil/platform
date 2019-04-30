@@ -1,41 +1,28 @@
-# platform
+# Platform
 
-## Webapp
+## How to run
 
-### Requirements
+1. Install [Docker](https://docs.docker.com/install/) and [docker-compose](https://docs.docker.com/compose/install/)
 
-Install `elm` and `elm-live` (dev server)
+1. Run all services: `docker-compose up -d`
 
-```bash
-yarn global add elm elm-live
-```
+1. Open [localhost:11001/index.html](http://localhost:11001/index.html)
 
-### develop
+## Development instructions per service:
 
-Use [Mockoon](https://mockoon.com/) to play with `./mock_responses/platform.json` (for some reasons CORS headers could not be saved as an environment setting in Mockoon - they need to be enabled manually)
+- [monolith](./monolith/README.md)
+- [webapp-server](./webapp-server/README.md)
+- [webapp](./webapp/README.md)
 
-```bash
-cd webapp
-
-# Clean build, copy static assets,
-# save new build,
-# run dev server on port 8000 with time-travel debugger
-# and open in browser
-rm -rf "./build" &&
-mkdir "build" &&
-cp -r "./src/static" "./build" &&
-elm-live "src/Main.elm" --dir="./build/static" --open --port=8000 --pushstate --start-page "index.html" -- --debug --output="./build/static/bundle.js"
-```
-
-### build
+## Useful commands
 
 ```bash
-cd webapp
+# list running containers
+docker-compose ps
 
-# Clean build, copy static assets,
-# save new build,
-rm -rf "./build" &&
-mkdir "build" &&
-cp -r "./src/static" "./build" &&
-elm make "src/Main.elm" --optimize --output="./build/static/bundle.js"
+# view logs
+docker-compose logs -f
+
+# stop all services and remove volumes
+docker-compose down -v
 ```

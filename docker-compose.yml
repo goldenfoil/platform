@@ -1,4 +1,4 @@
-version: '3.5'
+version: "3.5"
 
 services:
   pg-docker:
@@ -8,9 +8,32 @@ services:
       - ./monolith/init.sql:/docker-entrypoint-initdb.d/init.sql
       - $HOME/docker/volumes/postgres:/var/lib/postgresql/data
     ports:
-      - '0.0.0.0:5432:5432'
+      - "0.0.0.0:5432:5432"
     environment:
       POSTGRES_USER: awesome_user
       POSTGRES_PASSWORD: awesome_password
       POSTGRES_DB: awesome_db
-    
+
+  webapp:
+    image: goldenfoil/platform.webapp:latest
+    build:
+      context: ./webapp
+
+  monolith:
+    image: goldenfoil/platform.monolith:latest
+    build:
+      context: ./monolith
+    ports:
+      - "0.0.0.0:3000:3000"
+    # remove port binding, make api_url a parameter for webapp-server.
+    # keep port binding commented out for local development
+
+  webapp-server:
+    image: goldenfoil/platform.webapp-server:latest
+    build:
+      context: ./webapp-server
+    depends_on:
+      - webapp
+      - monolith
+    ports:
+      - "0.0.0.0:11001:11001"
