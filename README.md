@@ -24,7 +24,7 @@ cd webapp
 rm -rf "./build" &&
 mkdir "build" &&
 cp -r "./src/static" "./build" &&
-elm-live "src/Main.elm" --dir="./build" --open --port=8000 --pushstate --start-page "static/index.html" -- --debug --output="./build/static/bundle.js"
+elm-live "src/Main.elm" --dir="./build/static" --open --port=8000 --pushstate --start-page "index.html" -- --debug --output="./build/static/bundle.js"
 ```
 
 ### build

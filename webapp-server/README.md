@@ -4,7 +4,7 @@
 
 ```bash
 # build with docker (first tag is latest, and second tag is commit hash)
-docker build -t goldenfoil/platform.webapp-server:latest -t goldenfoil/platform.webapp-server:$(git log -1 --pretty=%h) .
+bash -c 'docker build -t goldenfoil/platform.webapp-server:latest -t goldenfoil/platform.webapp-server:$(git log -1 --pretty=%h) .'
 
 docker push goldenfoil/platform.webapp-server
 
@@ -16,6 +16,6 @@ docker run -p 11001:11001 goldenfoil/platform.webapp-server:latest
 
 ```bash
 # static file
-curl "http://localhost:11001/static/abc.txt"
+curl "http://localhost:11001/index.html"
 
 ```
