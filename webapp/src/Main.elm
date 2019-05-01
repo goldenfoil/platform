@@ -191,47 +191,62 @@ view : Model -> Html Msg
 view model =
     case model of
         Authenticated { username } ->
-            div []
-                [ text ("Welcome, " ++ username)
-                , div [] [ button [ onClick ManualSignOut ] [ text "Sign out" ] ]
-                ]
+            viewAuthenticated username
 
-        NotAuthenticated formErrors { username, password } submitAttempted ->
-            div
-                []
-                [ div [] [ text "Username" ]
-                , viewInput submitAttempted formErrors username ChangeUsername False
-                , div [] [ text "Password" ]
-                , viewInput submitAttempted formErrors password ChangePassword True
-                , div []
-                    [ button [ onClick Submit, disabled (isPendingState formErrors) ] [ text "Sign in" ]
-                    ]
-                , viewFormErrors formErrors
-                ]
+        NotAuthenticated formErrors formFields submitAttempted ->
+            viewNotAuthenticated formErrors formFields submitAttempted
 
-
-viewInput : Bool -> FormErrors -> FormField String -> (String -> Msg) -> Bool -> Html Msg
-viewInput submitAttempted formErrors field msg hideChars=
+viewAuthenticated : String -> Html Msg
+viewAuthenticated username =
     div []
-        [ input
-            [ value (FF.value field)
-            , type_ (if hideChars then "password" else "text")
-            , onInput msg
-            , disabled (isPendingState formErrors)
-            ]
-            []
-        , viewValidationMessages submitAttempted field
+        [ text ("Welcome, " ++ username)
+        , div [] [ button [ onClick ManualSignOut ] [ text "Sign out" ] ]
         ]
 
+
+viewNotAuthenticated : FormErrors -> FormFields -> Bool -> Html Msg
+viewNotAuthenticated formErrors { username, password } submitAttempted =
+    div [ class "wrapper" ]
+        [ div [ class "login-form" ]
+            [ h1 []
+                [ text "Shut up and put your money here" ]
+            , viewInput submitAttempted formErrors username ChangeUsername False "username"
+            , viewInput submitAttempted formErrors password ChangePassword True "password"
+            , div [ class "input-field-wrapper" ]
+                [ div [ class "wrap wrap-submit" ]
+                    [ input [ onClick Submit, type_ "submit", class "input-submit", value "Sign in", disabled (isPendingState formErrors) ]
+                        []
+                    ]
+                ]
+            , viewFormErrors formErrors
+            ]
+        ]
+
+
+viewInput : Bool -> FormErrors -> FormField String -> (String -> Msg) -> Bool -> String -> Html Msg
+viewInput submitAttempted formErrors field msg hideChars placeholderText =
+    div [ class "input-field-wrapper" ]
+        [ div [ class "wrap wrap-text" ]
+            [ input
+                [ value (FF.value field)
+                , type_ (if hideChars then "password" else "text")
+                , onInput msg
+                , disabled (isPendingState formErrors)
+                , placeholder placeholderText
+                , class "input-field"
+                ]
+                []
+            ]
+            , viewValidationMessages submitAttempted field
+        ]
 
 viewValidationMessages : Bool -> FormField a -> Html Msg
 viewValidationMessages submitAttempted field =
     if submitAttempted || FF.wasChanged field then
         FF.validationMessages field
-            |> Maybe.map (List.intersperse ", " >> String.concat)
-            |> Maybe.withDefault "✓"
-            |> text
-
+            |> Maybe.map (List.map text)
+            |> Maybe.map (div [ class "login-validation-message" ])
+            |> Maybe.withDefault (div [] [])
     else
         div [] []
 
@@ -257,3 +272,4 @@ viewFormErrors errs =
 
         _ ->
             div [] []
+
