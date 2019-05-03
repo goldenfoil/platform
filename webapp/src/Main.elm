@@ -1,17 +1,22 @@
 module Main exposing (Model, Msg(..), init, main, update, view)
 
 import Browser
+import Colors exposing (..)
+import Css exposing (..)
+import Css.Animations as Animations
+import Css.Transitions as Transitions
 import FormField as FF exposing (FormField)
-import Html exposing (..)
-import Html.Attributes exposing (..)
-import Html.Events exposing (onClick, onInput)
+import Html
+import Html.Styled exposing (..)
+import Html.Styled.Attributes as A exposing (css)
+import Html.Styled.Events exposing (onClick, onInput)
 import Http
 import Json.Decode as D
 import Json.Encode as E
 
 
 main =
-    Browser.element { init = init, update = update, subscriptions = subscriptions, view = view }
+    Browser.element { init = init, update = update, subscriptions = subscriptions, view = view >> toUnstyled }
 
 
 subscriptions : Model -> Sub Msg
@@ -196,6 +201,7 @@ view model =
         NotAuthenticated formErrors formFields submitAttempted ->
             viewNotAuthenticated formErrors formFields submitAttempted
 
+
 viewAuthenticated : String -> Html Msg
 viewAuthenticated username =
     div []
@@ -204,17 +210,80 @@ viewAuthenticated username =
         ]
 
 
+wrapperStyle : Style
+wrapperStyle =
+    batch
+        [ displayFlex
+        , flexDirection column
+        , alignItems center
+        , Css.height (vh 100)
+        , position relative
+        , fontFamilies [ "Roboto" ]
+        , backgroundImage (url "/background.jpg")
+        , backgroundRepeat noRepeat
+        , backgroundPosition center
+        , backgroundSize cover
+        , before
+            [ property "content" "''"
+            , position absolute
+            , Css.width (pct 100)
+            , Css.height (pct 100)
+            , left zero
+            , right zero
+            , top zero
+            , bottom zero
+            , backgroundColor (alphaBlack 0.4)
+            , zIndex (int 1)
+            ]
+        ]
+
+
+headerStyle : Style
+headerStyle =
+    batch
+        [ fontSize (px 50)
+        , marginBottom (px 20)
+        , fontWeight (int 400)
+        ]
+
+
+loginFormStyle : Style
+loginFormStyle =
+    batch
+        [ Css.width (px 1020)
+        , marginTop (px 40)
+        , color (alphaWhite 0.9)
+        , padding (px 25)
+        , borderRadius (px 5)
+        , zIndex <| int 2
+        ]
+
+
+submitStyle : Style
+submitStyle =
+    batch
+        [ fontSize (px 18)
+        , cursor pointer
+        ]
+
+
 viewNotAuthenticated : FormErrors -> FormFields -> Bool -> Html Msg
 viewNotAuthenticated formErrors { username, password } submitAttempted =
-    div [ class "wrapper" ]
-        [ div [ class "login-form" ]
-            [ h1 []
-                [ text "Shut up and put your money here" ]
+    div [ css [ wrapperStyle ] ]
+        [ div [ css [ loginFormStyle ] ]
+            [ h1 [ css [ headerStyle ] ]
+                [ text "Hello" ]
             , viewInput submitAttempted formErrors username ChangeUsername False "username"
             , viewInput submitAttempted formErrors password ChangePassword True "password"
-            , div [ class "input-field-wrapper" ]
-                [ div [ class "wrap wrap-submit" ]
-                    [ input [ onClick Submit, type_ "submit", class "input-submit", value "Sign in", disabled (isPendingState formErrors) ]
+            , div [ css [ rowWrapper ] ]
+                [ div [ css [ borderWrapper, wrapSubmit ] ]
+                    [ input
+                        [ onClick Submit
+                        , A.type_ "submit"
+                        , A.value "Sign in"
+                        , A.disabled (isPendingState formErrors)
+                        , css [ allInputs, submitStyle ]
+                        ]
                         []
                     ]
                 ]
@@ -223,30 +292,144 @@ viewNotAuthenticated formErrors { username, password } submitAttempted =
         ]
 
 
+rowWrapper : Style
+rowWrapper =
+    batch
+        [ displayFlex
+        , marginBottom (px 15)
+        , alignItems center
+        , height (px 73)
+        ]
+
+
+borderWrapper : Style
+borderWrapper =
+    batch
+        [ displayFlex
+        , alignItems center
+        , height (px 40)
+        ]
+
+
+wrapSubmit : Style
+wrapSubmit =
+    marginTop (px 20)
+
+
+wrapText : Style
+wrapText =
+    marginRight (px 15)
+
+
+allInputs : Style
+allInputs =
+    let
+        focusActiveHover =
+            [ borderColor (hex "fff")
+            , backgroundColor (alphaBlack 0.1)
+            , borderWidth (px 2)
+            , color (hex "fff")
+            ]
+    in
+    batch
+        [ border3 (px 1) solid (alphaWhite 0.4)
+        , borderRadius (px 5)
+        , outline none
+        , height (px 38)
+        , display block
+        , minWidth (px 250)
+        , backgroundColor transparent
+        , fontSize (px 16)
+        , fontWeight (int 300)
+        , property "transition" "all ease .3s"
+        , color (alphaWhite 0.9)
+        , textShadow4 (px 1) (px 1) (px 1) (alphaBlack 0.3)
+        , focus focusActiveHover
+        , active focusActiveHover
+        , hover focusActiveHover
+        ]
+
+
+textInput : Style
+textInput =
+    let
+        focusActiveHover =
+            [ textIndent (px 14) ]
+    in
+    batch
+        [ textIndent (px 15)
+        , focus focusActiveHover
+        , active focusActiveHover
+        , hover focusActiveHover
+        , pseudoElement "placeholder"
+            [ color (alphaWhite 0.6)
+            , fontSize (px 18)
+            , textShadow4 (px 1) (px 1) (px 1) (alphaBlack 0.05)
+            ]
+        ]
+
+
 viewInput : Bool -> FormErrors -> FormField String -> (String -> Msg) -> Bool -> String -> Html Msg
 viewInput submitAttempted formErrors field msg hideChars placeholderText =
-    div [ class "input-field-wrapper" ]
-        [ div [ class "wrap wrap-text" ]
+    div [ css [ rowWrapper ] ]
+        [ div [ css [ borderWrapper, wrapText ] ]
             [ input
-                [ value (FF.value field)
-                , type_ (if hideChars then "password" else "text")
+                [ A.value (FF.value field)
+                , A.type_
+                    (if hideChars then
+                        "password"
+
+                     else
+                        "text"
+                    )
                 , onInput msg
-                , disabled (isPendingState formErrors)
-                , placeholder placeholderText
-                , class "input-field"
+                , A.disabled (isPendingState formErrors)
+                , A.placeholder placeholderText
+                , css [ allInputs, textInput ]
                 ]
                 []
             ]
-            , viewValidationMessages submitAttempted field
+        , viewValidationMessages submitAttempted field
         ]
+
+
+validationMessageStyle : Style
+validationMessageStyle =
+    let
+        alertBackground =
+            hex "ec7063"
+    in
+    batch
+        [ displayFlex
+        , flexDirection column
+        , alignItems flexStart
+        , padding2 (px 8) (px 15)
+        , borderRadius (px 5)
+        , backgroundColor alertBackground
+        , textShadow4 (px 1) (px 1) (px 1) (alphaBlack 0.2)
+        , position relative
+        , before
+            [ property "content" "''"
+            , position absolute
+            , left (px -10)
+            , top <| calc (pct 50) minus (px 5)
+            , width zero
+            , height zero
+            , borderTop3 (px 5) solid transparent
+            , borderRight3 (px 10) solid alertBackground
+            , borderBottom3 (px 5) solid transparent
+            ]
+        ]
+
 
 viewValidationMessages : Bool -> FormField a -> Html Msg
 viewValidationMessages submitAttempted field =
     if submitAttempted || FF.wasChanged field then
         FF.validationMessages field
-            |> Maybe.map (List.map text)
-            |> Maybe.map (div [ class "login-validation-message" ])
+            |> Maybe.map (List.map (\s -> div [] [ text s ]))
+            |> Maybe.map (div [ css [ validationMessageStyle ] ])
             |> Maybe.withDefault (div [] [])
+
     else
         div [] []
 
@@ -272,4 +455,3 @@ viewFormErrors errs =
 
         _ ->
             div [] []
-
