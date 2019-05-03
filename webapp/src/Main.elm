@@ -250,11 +250,14 @@ headerStyle =
 loginFormStyle : Style
 loginFormStyle =
     batch
-        [ Css.width (px 1020)
+        [ Css.width (px 800)
         , marginTop (px 40)
-        , color (alphaWhite 0.9)
+
+        -- , color (alphaWhite 0.9)
+        , color (alphaBlack 0.9)
         , padding (px 25)
-        , borderRadius (px 5)
+        , borderRadius (px 3)
+        , backgroundColor white
         , zIndex <| int 2
         ]
 
@@ -325,14 +328,13 @@ allInputs : Style
 allInputs =
     let
         focusActiveHover =
-            [ borderColor (hex "fff")
-            , backgroundColor (alphaBlack 0.1)
+            [ borderColor (alphaBlack 0.4)
             , borderWidth (px 2)
-            , color (hex "fff")
+            , color black
             ]
     in
     batch
-        [ border3 (px 1) solid (alphaWhite 0.4)
+        [ border3 (px 1) solid (alphaBlack 0.4)
         , borderRadius (px 5)
         , outline none
         , height (px 38)
@@ -342,8 +344,7 @@ allInputs =
         , fontSize (px 16)
         , fontWeight (int 300)
         , property "transition" "all ease .3s"
-        , color (alphaWhite 0.9)
-        , textShadow4 (px 1) (px 1) (px 1) (alphaBlack 0.3)
+        , color (alphaBlack 0.9)
         , focus focusActiveHover
         , active focusActiveHover
         , hover focusActiveHover
@@ -362,9 +363,8 @@ textInput =
         , active focusActiveHover
         , hover focusActiveHover
         , pseudoElement "placeholder"
-            [ color (alphaWhite 0.6)
+            [ color (alphaBlack 0.6)
             , fontSize (px 18)
-            , textShadow4 (px 1) (px 1) (px 1) (alphaBlack 0.05)
             ]
         ]
 
@@ -397,7 +397,7 @@ validationMessageStyle : Style
 validationMessageStyle =
     let
         alertBackground =
-            hex "ec7063"
+            hex "F9E79F"
     in
     batch
         [ displayFlex
@@ -406,8 +406,9 @@ validationMessageStyle =
         , padding2 (px 8) (px 15)
         , borderRadius (px 5)
         , backgroundColor alertBackground
-        , textShadow4 (px 1) (px 1) (px 1) (alphaBlack 0.2)
         , position relative
+        , lineHeight (pct 120)
+        , fontWeight (int 300)
         , before
             [ property "content" "''"
             , position absolute
@@ -426,8 +427,8 @@ viewValidationMessages : Bool -> FormField a -> Html Msg
 viewValidationMessages submitAttempted field =
     if submitAttempted || FF.wasChanged field then
         FF.validationMessages field
-            |> Maybe.map (List.map (\s -> div [] [ text s ]))
-            |> Maybe.map (div [ css [ validationMessageStyle ] ])
+            |> Maybe.map (List.map (\s -> li [] [ text s ]))
+            |> Maybe.map (ul [ css [ validationMessageStyle ] ])
             |> Maybe.withDefault (div [] [])
 
     else
@@ -444,14 +445,18 @@ isPendingState errs =
             False
 
 
+errorContainerStyle : Style
+errorContainerStyle =
+    height (px 20)
+
 viewFormErrors : FormErrors -> Html Msg
 viewFormErrors errs =
     case errs of
         Pending ->
-            div [] [ text "Signing in..." ]
+            div [ css [ errorContainerStyle, color (hex "34495E") ] ] [ text "Signing in..." ]
 
         ServerError errorMessage ->
-            div [] [ text errorMessage ]
+            div [ css [ errorContainerStyle, color (hex "CB4335") ] ] [ text errorMessage ]
 
         _ ->
-            div [] []
+            div [ css [ errorContainerStyle ] ] []
