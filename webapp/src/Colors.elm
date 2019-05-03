@@ -10,3 +10,9 @@ alphaWhite alpha =
 alphaBlack : Float -> Color
 alphaBlack alpha =
     rgba 0 0 0 alpha
+
+white : Color
+white = hex "fff"
+
+black : Color
+black = hex "000"
