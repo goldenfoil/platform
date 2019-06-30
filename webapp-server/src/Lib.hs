@@ -22,4 +22,4 @@ app = logStdoutDev
     $ serve apiProxy apiServer
 
 webAppEntry :: IO ()
-webAppEntry = run 11001 app
+webAppEntry = run 80 app

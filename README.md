@@ -6,7 +6,7 @@
 
 1. Run all services: `docker-compose up -d`
 
-1. Open [localhost:11001/index.html](http://localhost:11001/index.html)
+1. Open [localhost:80/index.html](http://localhost:80/index.html)
 
 ## Development instructions per service:
 

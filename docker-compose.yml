@@ -36,4 +36,4 @@ services:
       - webapp
       - monolith
     ports:
-      - "0.0.0.0:11001:11001"
+      - "80:80"
