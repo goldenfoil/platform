@@ -2,16 +2,17 @@
 elm-stuff
 # elm-repl generated files
 repl-temp-*
-
-# webapp build
+# elm builds
 webapp/build
 
-monolith/.stack-work/
-monolith/monolith.cabal
-monolith/*~
+# stack
+*/*~
+*/*.cabal
+*/.stack-work
 
-webapp-server/.stack-work/
-webapp-server/webapp-server.cabal
-webapp-server/*~
+# intellij
+.idea
+*/*.iml
 
+# mac
 .DS_Store
