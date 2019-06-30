@@ -17,6 +17,6 @@ COPY --from=elm-build /home/node/app/build/static /app/static
 
 WORKDIR /app
 
-EXPOSE 11001
+EXPOSE 80
 
 CMD ["/app/webapp-server-exe"]

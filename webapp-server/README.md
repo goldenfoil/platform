@@ -18,5 +18,5 @@ docker push goldenfoil/platform.webapp-server
 docker-compose build webapp webapp-server && docker-compose up -d
 
 # request a static file
-curl "http://localhost:11001/index.html"
+curl "http://localhost:80/index.html"
 ```

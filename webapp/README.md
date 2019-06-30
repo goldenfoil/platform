@@ -23,7 +23,7 @@ yarn global add elm
 yarn global add elm-live
 ```
 
-```bash
+```shell
 cd webapp
 
 # Clean build, copy static assets,
